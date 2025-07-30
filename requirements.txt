@@ -1,0 +1,13 @@
+requests==2.31.0
+beautifulsoup4==4.12.2
+lxml==4.9.3
+pandas==2.0.3
+urllib3==2.0.4
+numpy>=1.21.0
+matplotlib>=3.5.0
+seaborn>=0.11.0
+nltk>=3.8.0
+zeyrek>=0.1.2
+spacy>=3.4.0
+turkish-stemmer>=1.0.0
+unicodedata2>=14.0.0
