@@ -52,86 +52,178 @@ class SeturComplaintScraper:
         details = {}
         
         try:
-            # Extract rating if exists
-            rating_element = soup.find('div', class_='rating') or soup.find('span', class_='rating')
-            if rating_element:
-                stars = rating_element.find_all('i', class_='star-full') or rating_element.find_all('span', class_='star')
-                details['rating'] = len(stars) if stars else None            # Extract full complaint text - updated selector for complaint detail
-            complaint_detail = soup.find('div', class_='complaint-detail-description')
-            if complaint_detail:
-                # Get all paragraphs within the complaint detail
-                paragraphs = complaint_detail.find_all('p')
-                if paragraphs:
-                    complaint_text = '\n'.join([p.get_text(strip=True) for p in paragraphs])
-                    details['full_complaint'] = complaint_text
-                else:
-                    details['full_complaint'] = complaint_detail.get_text(strip=True)
-            else:
-                # Fallback to original selectors
-                complaint_text = soup.find('div', class_='complaint-text') or soup.find('div', class_='complaint-content')
-                if complaint_text:
-                    details['full_complaint'] = complaint_text.get_text(strip=True)
+            # Extract complaint text - comprehensive search for complaint content
+            complaint_text = None
             
-            # Extract view count from detail page
-            view_element = soup.find('span', class_='js-view-count count js-increment-view')
-            if view_element:
-                details['views_detail'] = view_element.get_text(strip=True)
+            # Try multiple selectors for complaint text
+            complaint_selectors = [
+                'div.complaint-detail-description',
+                'div.complaint-text', 
+                'div.complaint-content',
+                'div.complaint-detail',
+                'section.complaint-content',
+                'article.complaint-text'
+            ]
             
-            # Extract company response - updated selector for complaint reply
-            response_wrapper = soup.find('div', class_='complaint-reply-wrapper ga-v ga-c')
-            if response_wrapper:
-                response_message = response_wrapper.find('p', class_='message')
-                if response_message:
-                    details['company_response'] = response_message.get_text(strip=True)
-            else:
-                # Fallback to original selectors
-                response_section = soup.find('div', class_='company-response') or soup.find('section', class_='response')
-                if response_section:
-                    details['company_response'] = response_section.get_text(strip=True)
+            for selector in complaint_selectors:
+                complaint_element = soup.select_one(selector)
+                if complaint_element:
+                    # Get all paragraphs within the complaint detail
+                    paragraphs = complaint_element.find_all('p')
+                    if paragraphs:
+                        complaint_text = '\n'.join([p.get_text(strip=True) for p in paragraphs])
+                    else:
+                        complaint_text = complaint_element.get_text(strip=True)
+                    break
             
-            # Extract comments and replies
+            details['complaint_text'] = complaint_text or ''
+            
+            # Extract view count from detail page with multiple selectors
+            view_selectors = [
+                'span.js-view-count.count.js-increment-view',
+                'span.view-count',
+                'div.view-count',
+                'span.count'
+            ]
+            
+            for selector in view_selectors:
+                view_element = soup.select_one(selector)
+                if view_element:
+                    details['view'] = view_element.get_text(strip=True)
+                    break
+            
+            # Extract user information from detail page
+            user_selectors = [
+                'a.username',
+                'span.username',
+                'div.username',
+                'header.profile-details a',
+                'div.profile a'
+            ]
+            
+            for selector in user_selectors:
+                user_element = soup.select_one(selector)
+                if user_element:
+                    details['user_id'] = user_element.get_text(strip=True)
+                    break
+            
+            # Extract timestamp with multiple selectors
+            timestamp_selectors = [
+                'div.js-tooltip.time',
+                'time',
+                'span.time',
+                'div.time',
+                'span.date'
+            ]
+            
+            for selector in timestamp_selectors:
+                timestamp_element = soup.select_one(selector)
+                if timestamp_element:
+                    details['timestamp'] = timestamp_element.get_text(strip=True)
+                    break
+            
+            # Extract complaint answer container (company response)
+            answer_selectors = [
+                'div.complaint-answer-container',
+                'div.complaint-reply-wrapper',
+                'div.company-response',
+                'section.response',
+                'div.response-container'
+            ]
+            
+            for selector in answer_selectors:
+                answer_element = soup.select_one(selector)
+                if answer_element:
+                    # Look for message within the container
+                    message_element = answer_element.find('p', class_='message') or answer_element
+                    details['complaint_answer_container'] = message_element.get_text(strip=True)
+                    break
+            
+            # Extract comments with comprehensive selectors
             comments = []
-            comment_sections = soup.find_all('div', class_='comment') or soup.find_all('article', class_='comment')
+            comment_selectors = [
+                'div.comment',
+                'article.comment',
+                'div.comment-item',
+                'section.comment'
+            ]
+            
+            comment_sections = []
+            for selector in comment_selectors:
+                found_comments = soup.select(selector)
+                if found_comments:
+                    comment_sections = found_comments
+                    break
             
             for comment in comment_sections:
                 comment_data = {}
                 
-                # Comment author
-                author = comment.find('a', class_='username') or comment.find('span', class_='comment-author')
-                if author:
-                    comment_data['author'] = author.get_text(strip=True)
+                # Comment author with multiple selectors
+                author_selectors = ['a.username', 'span.comment-author', 'div.author', 'span.username']
+                for selector in author_selectors:
+                    author = comment.select_one(selector)
+                    if author:
+                        comment_data['author'] = author.get_text(strip=True)
+                        break
                 
-                # Comment text
-                comment_text = comment.find('div', class_='comment-text') or comment.find('p', class_='comment-content')
-                if comment_text:
-                    comment_data['text'] = comment_text.get_text(strip=True)
+                # Comment text with multiple selectors
+                text_selectors = ['div.comment-text', 'p.comment-content', 'div.comment-body', 'span.comment-text']
+                for selector in text_selectors:
+                    comment_text = comment.select_one(selector)
+                    if comment_text:
+                        comment_data['text'] = comment_text.get_text(strip=True)
+                        break
                 
-                # Comment time
-                comment_time = comment.find('time') or comment.find('span', class_='time')
-                if comment_time:
-                    comment_data['time'] = comment_time.get_text(strip=True)
+                # Comment time with multiple selectors
+                time_selectors = ['time', 'span.time', 'div.time', 'span.date']
+                for selector in time_selectors:
+                    comment_time = comment.select_one(selector)
+                    if comment_time:
+                        comment_data['time'] = comment_time.get_text(strip=True)
+                        break
                 
                 # Replies to this comment
                 replies = []
-                reply_elements = comment.find_all('div', class_='reply') or comment.find_all('div', class_='comment-reply')
+                reply_selectors = ['div.reply', 'div.comment-reply', 'article.reply']
+                
+                reply_elements = []
+                for selector in reply_selectors:
+                    found_replies = comment.select(selector)
+                    if found_replies:
+                        reply_elements = found_replies
+                        break
+                
                 for reply in reply_elements:
                     reply_data = {}
-                    reply_author = reply.find('a', class_='username') or reply.find('span', class_='reply-author')
-                    if reply_author:
-                        reply_data['author'] = reply_author.get_text(strip=True)
                     
-                    reply_text = reply.find('div', class_='reply-text') or reply.find('p', class_='reply-content')
-                    if reply_text:
-                        reply_data['text'] = reply_text.get_text(strip=True)
+                    # Reply author
+                    for selector in author_selectors:
+                        reply_author = reply.select_one(selector)
+                        if reply_author:
+                            reply_data['author'] = reply_author.get_text(strip=True)
+                            break
                     
-                    reply_time = reply.find('time') or reply.find('span', class_='time')
-                    if reply_time:
-                        reply_data['time'] = reply_time.get_text(strip=True)
+                    # Reply text
+                    reply_text_selectors = ['div.reply-text', 'p.reply-content', 'div.reply-body']
+                    for selector in reply_text_selectors:
+                        reply_text = reply.select_one(selector)
+                        if reply_text:
+                            reply_data['text'] = reply_text.get_text(strip=True)
+                            break
                     
-                    replies.append(reply_data)
+                    # Reply time
+                    for selector in time_selectors:
+                        reply_time = reply.select_one(selector)
+                        if reply_time:
+                            reply_data['time'] = reply_time.get_text(strip=True)
+                            break
+                    
+                    if reply_data:  # Only add if we found some data
+                        replies.append(reply_data)
                 
                 comment_data['replies'] = replies
-                comments.append(comment_data)
+                if comment_data:  # Only add if we found some data
+                    comments.append(comment_data)
             
             details['comments'] = comments
             
@@ -158,47 +250,112 @@ class SeturComplaintScraper:
             try:
                 complaint_data = {}
                 
-                # Extract complaint ID
-                complaint_id = card.get('data-id')
+                # Extract complaint ID with multiple selectors
+                complaint_id = card.get('data-id') or card.get('id')
+                if not complaint_id:
+                    # Try to extract from URL or other attributes
+                    url_element = card.find('a')
+                    if url_element and url_element.get('href'):
+                        href = url_element.get('href')
+                        # Extract ID from URL if possible
+                        id_match = re.search(r'/(\d+)', href)
+                        if id_match:
+                            complaint_id = id_match.group(1)
+                
                 if complaint_id:
                     complaint_data['id'] = complaint_id
                 
-                # Extract complaint title and URL
-                title_link = card.find('a', class_='complaint-layer') or card.find('h2').find('a') if card.find('h2') else None
+                # Extract complaint title and URL with multiple selectors
+                title_selectors = [
+                    'a.complaint-layer',
+                    'h2 a',
+                    'h3 a',
+                    'a[href*="complaint"]',
+                    'a[href*="sikayet"]'
+                ]
+                
+                title_link = None
+                for selector in title_selectors:
+                    title_link = card.select_one(selector)
+                    if title_link:
+                        break
+                
                 if title_link:
                     complaint_data['title'] = title_link.get_text(strip=True)
                     complaint_data['url'] = urljoin(self.base_url, title_link.get('href'))
                 
-                # Extract user information
-                profile_section = card.find('header', class_='profile-details') or card.find('div', class_='profile')
+                # Extract user information with comprehensive selectors
+                user_selectors = [
+                    'header.profile-details',
+                    'div.profile',
+                    'div.user-info',
+                    'section.profile'
+                ]
+                
+                profile_section = None
+                for selector in user_selectors:
+                    profile_section = card.select_one(selector)
+                    if profile_section:
+                        break
+                
                 if profile_section:
-                    # Username
-                    username_link = profile_section.find('a', class_='username')
-                    if username_link:
-                        complaint_data['username'] = username_link.get_text(strip=True)
+                    # Username/User ID with multiple selectors
+                    username_selectors = ['a.username', 'span.username', 'div.username']
+                    for selector in username_selectors:
+                        username_link = profile_section.select_one(selector)
+                        if username_link:
+                            complaint_data['user_id'] = username_link.get_text(strip=True)
+                            break
                     
-                    # Post time
-                    time_element = profile_section.find('div', class_='js-tooltip time') or profile_section.find('time')
-                    if time_element:
-                        complaint_data['time'] = time_element.get_text(strip=True)
-                      # View count - updated selector
-                    view_count = profile_section.find('span', class_='js-view-count count js-increment-view')
-                    if view_count:
-                        complaint_data['views'] = view_count.get_text(strip=True)
+                    # Timestamp with multiple selectors
+                    time_selectors = [
+                        'div.js-tooltip.time',
+                        'time',
+                        'span.time',
+                        'div.time',
+                        'span.date'
+                    ]
+                    for selector in time_selectors:
+                        time_element = profile_section.select_one(selector)
+                        if time_element:
+                            complaint_data['timestamp'] = time_element.get_text(strip=True)
+                            break
+                    
+                    # View count with multiple selectors
+                    view_selectors = [
+                        'span.js-view-count.count.js-increment-view',
+                        'span.view-count',
+                        'div.view-count',
+                        'span.count'
+                    ]
+                    for selector in view_selectors:
+                        view_count = profile_section.select_one(selector)
+                        if view_count:
+                            complaint_data['view'] = view_count.get_text(strip=True)
+                            break
                 
-                # Extract complaint description/preview
-                description = card.find('a', class_='complaint-description') or card.find('div', class_='complaint-text')
-                if description:
-                    complaint_data['description'] = description.get_text(strip=True)
+                # Extract complaint description/preview text
+                description_selectors = [
+                    'a.complaint-description',
+                    'div.complaint-text',
+                    'div.complaint-preview',
+                    'p.complaint-summary'
+                ]
                 
-                # Extract support count (upvotes)
+                for selector in description_selectors:
+                    description = card.select_one(selector)
+                    if description:
+                        complaint_data['complaint_text_preview'] = description.get_text(strip=True)
+                        break
+                
+                # Extract support count (upvotes) - keeping this as additional info
                 upvoter_count = card.get('data-upvoter-count')
                 if upvoter_count:
                     complaint_data['supported'] = upvoter_count
                 
                 # Get detailed information from complaint page
                 if 'url' in complaint_data:
-                    logger.info(f"Extracting details for complaint: {complaint_data['title']}")
+                    logger.info(f"Extracting details for complaint: {complaint_data.get('title', 'Unknown')}")
                     details = self.extract_complaint_details(complaint_data['url'])
                     complaint_data.update(details)
                     
@@ -281,24 +438,23 @@ class SeturComplaintScraper:
             logger.warning("No data to save")
             return
         
-        # Flatten the data for CSV
+        # Flatten the data for CSV with updated field names
         flattened_data = []
         for complaint in self.complaints_data:
             row = {
                 'id': complaint.get('id', ''),
                 'title': complaint.get('title', ''),
-                'username': complaint.get('username', ''),
-                'time': complaint.get('time', ''),
-                'views': complaint.get('views', ''),
-                'views_detail': complaint.get('views_detail', ''),
-                'supported': complaint.get('supported', ''),
-                'description': complaint.get('description', ''),
-                'full_complaint': complaint.get('full_complaint', ''),
-                'rating': complaint.get('rating', ''),
-                'company_response': complaint.get('company_response', ''),
+                'complaint_text': complaint.get('complaint_text', ''),
+                'user_id': complaint.get('user_id', ''),
+                'timestamp': complaint.get('timestamp', ''),
+                'view': complaint.get('view', ''),
                 'url': complaint.get('url', ''),
+                'complaint_answer_container': complaint.get('complaint_answer_container', ''),
                 'comments_count': len(complaint.get('comments', [])),
-                'comments': json.dumps(complaint.get('comments', []), ensure_ascii=False)
+                'comments': json.dumps(complaint.get('comments', []), ensure_ascii=False),
+                # Keep some additional fields that might be useful
+                'complaint_text_preview': complaint.get('complaint_text_preview', ''),
+                'supported': complaint.get('supported', '')
             }
             flattened_data.append(row)
         
@@ -320,20 +476,19 @@ class SeturComplaintScraper:
             conn = sqlite3.connect(filename)
             c = conn.cursor()
 
-            # Create main complaints table
+            # Create main complaints table with updated field names
             c.execute('''
                 CREATE TABLE IF NOT EXISTS complaints (
                     id TEXT PRIMARY KEY,
                     title TEXT,
-                    username TEXT,
-                    time TEXT,
-                    views TEXT,
-                    supported TEXT,
-                    description TEXT,
-                    full_complaint TEXT,
-                    rating INTEGER,
-                    company_response TEXT,
-                    url TEXT
+                    complaint_text TEXT,
+                    user_id TEXT,
+                    timestamp TEXT,
+                    view TEXT,
+                    url TEXT,
+                    complaint_answer_container TEXT,
+                    complaint_text_preview TEXT,
+                    supported TEXT
                 )
             ''')
 
@@ -360,24 +515,23 @@ class SeturComplaintScraper:
                 )
             ''')
 
-            # Insert complaints and related comments/replies
+            # Insert complaints and related comments/replies with updated field names
             for complaint in self.complaints_data:
                 c.execute('''
                     INSERT OR REPLACE INTO complaints
-                    (id, title, username, time, views, supported, description, full_complaint, rating, company_response, url)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (id, title, complaint_text, user_id, timestamp, view, url, complaint_answer_container, complaint_text_preview, supported)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (
                     complaint.get('id', ''),
                     complaint.get('title', ''),
-                    complaint.get('username', ''),
-                    complaint.get('time', ''),
-                    complaint.get('views', ''),
-                    complaint.get('supported', ''),
-                    complaint.get('description', ''),
-                    complaint.get('full_complaint', ''),
-                    complaint.get('rating', None),
-                    complaint.get('company_response', ''),
-                    complaint.get('url', '')
+                    complaint.get('complaint_text', ''),
+                    complaint.get('user_id', ''),
+                    complaint.get('timestamp', ''),
+                    complaint.get('view', ''),
+                    complaint.get('url', ''),
+                    complaint.get('complaint_answer_container', ''),
+                    complaint.get('complaint_text_preview', ''),
+                    complaint.get('supported', '')
                 ))
 
                 comments = complaint.get('comments', [])
@@ -417,14 +571,14 @@ def main():
     complaints = scraper.scrape_all_complaints(max_pages=41)
     
     # Save data in both formats
-    scraper.save_to_json("setur_complaints.json")
-    scraper.save_to_csv("setur_complaints.csv")
+    scraper.save_to_json("setur_complaints_new.json")
+    scraper.save_to_csv("setur_complaints_new.csv")
     
     print(f"\nScraping completed! Extracted {len(complaints)} complaints.")
     print("Files saved:")
-    print("- setur_complaints.json")
-    print("- setur_complaints.csv")
-    
+    print("- setur_complaints_new.json")
+    print("- setur_complaints_new.csv")
+
     # Print sample data
     if complaints:
         print("\nSample complaint data:")
