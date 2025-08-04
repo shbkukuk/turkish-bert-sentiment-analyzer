@@ -62,9 +62,12 @@ class SeturComplaintScraper:
                 'div.complaint-content',
                 'div.complaint-detail',
                 'section.complaint-content',
-                'article.complaint-text'
+                'article.complaint-text',
+                'div.complaint-thank-message',
+                'p.complaint-description',
+                'div.complaint-description',
+                'div.complaint-preview'
             ]
-            
             for selector in complaint_selectors:
                 complaint_element = soup.select_one(selector)
                 if complaint_element:
@@ -76,7 +79,67 @@ class SeturComplaintScraper:
                         complaint_text = complaint_element.get_text(strip=True)
                     break
             
+            # If still no complaint text found, try more specific selectors
+            if not complaint_text:
+                # Try to find complaint text in specific nested structures
+                specific_selectors = [
+                    'div.complaint-detail-description p',
+                    'div.complaint-content p',
+                    'div.complaint-text p',
+                    'div.complaint-detail p',
+                    'p.complaint-description',
+                    'div.complaint-description p',
+                    'div.complaint-preview p'
+                ]
+                for selector in specific_selectors:
+                    elements = soup.select(selector)
+                    if elements:
+                        complaint_text = '\n'.join([elem.get_text(strip=True) for elem in elements])
+                        break
+            
+            # If still no complaint text, try even more broad selectors
+            if not complaint_text:
+                broad_selectors = [
+                    'div[class*="complaint"] p',
+                    'div[class*="detail"] p',
+                    'div[class*="description"] p',
+                    'article p',
+                    'main p'
+                ]
+                for selector in broad_selectors:
+                    elements = soup.select(selector)
+                    if elements:
+                        # Filter out very short texts (likely not the main complaint)
+                        filtered_texts = [elem.get_text(strip=True) for elem in elements if len(elem.get_text(strip=True)) > 20]
+                        if filtered_texts:
+                            complaint_text = '\n'.join(filtered_texts)
+                            break
+            
+            # Last resort: try to find any substantial text content
+            if not complaint_text:
+                # Look for any paragraph with substantial content
+                all_paragraphs = soup.find_all('p')
+                substantial_paragraphs = []
+                for p in all_paragraphs:
+                    text = p.get_text(strip=True)
+                    # Look for paragraphs with substantial content (more than 50 characters)
+                    # and exclude navigation/footer content
+                    if (len(text) > 50 and 
+                        not any(word in text.lower() for word in ['menu', 'copyright', 'footer', 'navigation', 'cookie', 'gizlilik'])):
+                        substantial_paragraphs.append(text)
+                
+                if substantial_paragraphs:
+                    # Take the longest paragraph as it's likely the complaint text
+                    complaint_text = max(substantial_paragraphs, key=len)
+            
             details['complaint_text'] = complaint_text or ''
+            if details['complaint_text'] == '':
+                logger.warning(f"No complaint text found for {complaint_url}")
+                # Add debug information about what was found on the page
+                logger.debug(f"Available divs: {[div.get('class') for div in soup.find_all('div') if div.get('class')]}")
+            else:
+                logger.debug(f"Found complaint text ({len(details['complaint_text'])} chars) for {complaint_url}")
+                
             
             # Extract view count from detail page with multiple selectors
             view_selectors = [
@@ -334,18 +397,25 @@ class SeturComplaintScraper:
                             complaint_data['view'] = view_count.get_text(strip=True)
                             break
                 
-                # Extract complaint description/preview text
+                # Extract complaint description/preview text from listing page
                 description_selectors = [
+                    'p.complaint-description',
+                    'div.complaint-description',
                     'a.complaint-description',
                     'div.complaint-text',
                     'div.complaint-preview',
-                    'p.complaint-summary'
+                    'div.complaint-detail-description',
+                    'p.complaint-summary',
+                    'div.complaint-thank-message',
                 ]
                 
                 for selector in description_selectors:
                     description = card.select_one(selector)
                     if description:
                         complaint_data['complaint_text_preview'] = description.get_text(strip=True)
+                        # Also set as main complaint text if we don't have a URL to visit detail page
+                        if 'url' not in complaint_data:
+                            complaint_data['complaint_text'] = description.get_text(strip=True)
                         break
                 
                 # Extract support count (upvotes) - keeping this as additional info
@@ -359,8 +429,29 @@ class SeturComplaintScraper:
                     details = self.extract_complaint_details(complaint_data['url'])
                     complaint_data.update(details)
                     
+                    # If detail page didn't provide complaint text, use the preview text
+                    if not details.get('complaint_text') and complaint_data.get('complaint_text_preview'):
+                        complaint_data['complaint_text'] = complaint_data['complaint_text_preview']
+                    
                     # Add a small delay to be respectful
                     time.sleep(1)
+                else:
+                    # If no URL available, try to get complaint text from various sources
+                    complaint_text = complaint_data.get('complaint_text', '')
+                    
+                    if not complaint_text:
+                        # Try to get complaint text from thank message
+                        thank_message = card.select_one('div.complaint-thank-message p')
+                        if thank_message:
+                            complaint_text = thank_message.get_text(strip=True)
+                    
+                    if not complaint_text:
+                        # Try to get complaint text from thank message div
+                        thank_div = card.select_one('div.complaint-thank-message')
+                        if thank_div:
+                            complaint_text = thank_div.get_text(strip=True)
+                    
+                    complaint_data['complaint_text'] = complaint_text
                 
                 complaints.append(complaint_data)
                 
@@ -380,7 +471,7 @@ class SeturComplaintScraper:
         
         # Look for pagination
         pagination = soup.find('div', class_='pagination') or soup.find('nav', class_='pagination')
-        if pagination:
+        if pagination and hasattr(pagination, 'find_all'):
             page_links = pagination.find_all('a')
             if page_links:
                 # Get the last page number
@@ -392,6 +483,24 @@ class SeturComplaintScraper:
                 return last_page
         
         return 1
+    def search_complaints_is_empty(self, complaints):
+        """Remove complaints with empty text and log warnings"""
+        filtered_complaints = []
+        removed_count = 0
+        
+        for complaint in complaints:
+            if not complaint.get('complaint_text'):
+                logger.warning(f"User ID {complaint.get('user_id', 'Unknown')} Complaint ID {complaint.get('id', 'Unknown')} has no text.")
+                removed_count += 1
+            else:
+                filtered_complaints.append(complaint)
+        
+        if removed_count == 0:    
+            logger.info("All complaints have text content.")
+        else:
+            logger.info(f"Removed {removed_count} complaints without text content.")
+        
+        return filtered_complaints
 
     def scrape_all_complaints(self, max_pages=None):
         """Scrape all complaints from Setur tourism page"""
@@ -415,6 +524,7 @@ class SeturComplaintScraper:
             logger.info(f"Scraping page {page_num} of {total_pages}")
             
             complaints = self.extract_complaints_from_page(page_url)
+            complaints = self.search_complaints_is_empty(complaints)
             all_complaints.extend(complaints)
             
             logger.info(f"Extracted {len(complaints)} complaints from page {page_num}")
@@ -466,103 +576,103 @@ class SeturComplaintScraper:
             writer.writerows(flattened_data)
         
         logger.info(f"Data saved to {filename}")
+
     def save_to_sql(self, filename="setur_complaints.sql"):
-        def save_to_sql(self, filename="setur_complaints.sql"):
-            """Save complaints data to a SQLite database file"""
-            if not self.complaints_data:
-                logger.warning("No data to save")
-                return
+        """Save complaints data to a SQLite database file"""
+        if not self.complaints_data:
+            logger.warning("No data to save")
+            return
 
-            conn = sqlite3.connect(filename)
-            c = conn.cursor()
+        conn = sqlite3.connect(filename)
+        c = conn.cursor()
 
-            # Create main complaints table with updated field names
+        # Create main complaints table with updated field names
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS complaints (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                complaint_text TEXT,
+                user_id TEXT,
+                timestamp TEXT,
+                view TEXT,
+                url TEXT,
+                complaint_answer_container TEXT,
+                complaint_text_preview TEXT,
+                supported TEXT
+            )
+        ''')
+
+        # Create comments table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS comments (
+                complaint_id TEXT,
+                author TEXT,
+                text TEXT,
+                time TEXT,
+                FOREIGN KEY (complaint_id) REFERENCES complaints(id)
+            )
+        ''')
+
+        # Create replies table
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS replies (
+                complaint_id TEXT,
+                comment_index INTEGER,
+                author TEXT,
+                text TEXT,
+                time TEXT,
+                FOREIGN KEY (complaint_id) REFERENCES complaints(id)
+            )
+        ''')
+
+        # Insert complaints and related comments/replies with updated field names
+        for complaint in self.complaints_data:
             c.execute('''
-                CREATE TABLE IF NOT EXISTS complaints (
-                    id TEXT PRIMARY KEY,
-                    title TEXT,
-                    complaint_text TEXT,
-                    user_id TEXT,
-                    timestamp TEXT,
-                    view TEXT,
-                    url TEXT,
-                    complaint_answer_container TEXT,
-                    complaint_text_preview TEXT,
-                    supported TEXT
-                )
-            ''')
+                INSERT OR REPLACE INTO complaints
+                (id, title, complaint_text, user_id, timestamp, view, url, complaint_answer_container, complaint_text_preview, supported)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                complaint.get('id', ''),
+                complaint.get('title', ''),
+                complaint.get('complaint_text', ''),
+                complaint.get('user_id', ''),
+                complaint.get('timestamp', ''),
+                complaint.get('view', ''),
+                complaint.get('url', ''),
+                complaint.get('complaint_answer_container', ''),
+                complaint.get('complaint_text_preview', ''),
+                complaint.get('supported', '')
+            ))
 
-            # Create comments table
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS comments (
-                    complaint_id TEXT,
-                    author TEXT,
-                    text TEXT,
-                    time TEXT,
-                    FOREIGN KEY (complaint_id) REFERENCES complaints(id)
-                )
-            ''')
-
-            # Create replies table
-            c.execute('''
-                CREATE TABLE IF NOT EXISTS replies (
-                    complaint_id TEXT,
-                    comment_index INTEGER,
-                    author TEXT,
-                    text TEXT,
-                    time TEXT,
-                    FOREIGN KEY (complaint_id) REFERENCES complaints(id)
-                )
-            ''')
-
-            # Insert complaints and related comments/replies with updated field names
-            for complaint in self.complaints_data:
+            comments = complaint.get('comments', [])
+            for idx, comment in enumerate(comments):
                 c.execute('''
-                    INSERT OR REPLACE INTO complaints
-                    (id, title, complaint_text, user_id, timestamp, view, url, complaint_answer_container, complaint_text_preview, supported)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO comments
+                    (complaint_id, author, text, time)
+                    VALUES (?, ?, ?, ?)
                 ''', (
                     complaint.get('id', ''),
-                    complaint.get('title', ''),
-                    complaint.get('complaint_text', ''),
-                    complaint.get('user_id', ''),
-                    complaint.get('timestamp', ''),
-                    complaint.get('view', ''),
-                    complaint.get('url', ''),
-                    complaint.get('complaint_answer_container', ''),
-                    complaint.get('complaint_text_preview', ''),
-                    complaint.get('supported', '')
+                    comment.get('author', ''),
+                    comment.get('text', ''),
+                    comment.get('time', '')
                 ))
-
-                comments = complaint.get('comments', [])
-                for idx, comment in enumerate(comments):
+                replies = comment.get('replies', [])
+                for reply in replies:
                     c.execute('''
-                        INSERT INTO comments
-                        (complaint_id, author, text, time)
-                        VALUES (?, ?, ?, ?)
+                        INSERT INTO replies
+                        (complaint_id, comment_index, author, text, time)
+                        VALUES (?, ?, ?, ?, ?)
                     ''', (
                         complaint.get('id', ''),
-                        comment.get('author', ''),
-                        comment.get('text', ''),
-                        comment.get('time', '')
+                        idx,
+                        reply.get('author', ''),
+                        reply.get('text', ''),
+                        reply.get('time', '')
                     ))
-                    replies = comment.get('replies', [])
-                    for reply in replies:
-                        c.execute('''
-                            INSERT INTO replies
-                            (complaint_id, comment_index, author, text, time)
-                            VALUES (?, ?, ?, ?, ?)
-                        ''', (
-                            complaint.get('id', ''),
-                            idx,
-                            reply.get('author', ''),
-                            reply.get('text', ''),
-                            reply.get('time', '')
-                        ))
 
-            conn.commit()
-            conn.close()
-            logger.info(f"Data saved to {filename}")
+        conn.commit()
+        conn.close()
+        logger.info(f"Data saved to {filename}")
 
 def main():
     scraper = SeturComplaintScraper()
