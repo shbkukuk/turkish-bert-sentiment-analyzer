@@ -1,0 +1,25 @@
+# Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.venv
+env/
+venv/
+ENV/
+build/
+dist/
+*.egg-info/
+
+# PDF files
+*.pdf
+
+# ZIP files
+*.zip
+
+# JSON files
+*.json
+
+# CSV files
+*.csv
