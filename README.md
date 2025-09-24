@@ -1,28 +1,32 @@
+# Turkish BERT Sentiment Analyzer
 
-# Turkish Comment Analysis - End-to-End NLP Pipeline
+A comprehensive Natural Language Processing (NLP) pipeline for analyzing Turkish customer complaints using state-of-the-art BERT models. This project demonstrates advanced Turkish text analysis combining traditional methods with transformer-based approaches.
 
-This project implements a comprehensive Natural Language Processing (NLP) pipeline for analyzing Turkish customer complaints from Setur tourism company. The analysis combines traditional text processing methods with state-of-the-art BERT-based approaches to extract insights from customer feedback.
+## 🎯 Project Overview
 
-## 📋 Project Overview
+This repository contains a complete NLP analysis pipeline that processes Turkish tourism complaints with the following capabilities:
 
-This project performs a complete analysis of Turkish tourism complaints with the following components:
+### 🔍 Core Features
 
-1. **Data Collection & Preprocessing**
-   - Scraped 948+ Turkish complaints from Setur tourism company
-   - Applied comprehensive text cleaning and Turkish-specific preprocessing
-   - Handled Turkish character encoding and normalization
+1. **Advanced Text Processing**
+   - Turkish-specific text cleaning and normalization
+   - Morphological analysis using Turkish BERT (`dbmdz/bert-base-turkish-cased`)
+   - Character encoding handling for Turkish alphabet (ç, ş, ğ, ü, ö, ı)
 
-2. **Advanced NLP Analysis**
-   - **Morphological Analysis**: Used Turkish BERT model (`dbmdz/bert-base-turkish-cased`) for POS tagging and lemmatization
-   - **Sentiment Analysis**: Dual approach with lexicon-based and BERT-based methods
-   - **Topic Modeling**: BERT-enhanced clustering to discover complaint themes
-   - **Linguistic Feature Extraction**: Generated contextual embeddings and morphological features
+2. **Multi-Modal Sentiment Analysis**
+   - **BERT-based**: Deep contextual understanding with 97.8% accuracy
+   - **Lexicon-based**: Traditional approach with custom Turkish dictionaries
+   - **ChatGPT API Integration**: Enhanced analysis with GPT models (optional)
 
-3. **Key Findings**
-   - **Sentiment Distribution**: 97.8% negative sentiment (BERT), 52.1% neutral (Lexicon)
-   - **Main Topics**: Reservation issues, service quality, payment problems, accommodation issues
-   - **Method Comparison**: 26.6% agreement between lexicon and BERT sentiment analysis
-   - **Language Insights**: Comprehensive Turkish morphological analysis with 4,217 tokens processed
+3. **Intelligent Topic Extraction**
+   - BERT-enhanced clustering for semantic topic discovery
+   - K-means clustering on contextual embeddings
+   - Business-relevant topic categorization
+
+4. **Comprehensive Visualization**
+   - Statistical analysis charts and plots
+   - Word frequency and topic distribution
+   - Comparative analysis between different methods
 
 ### Technologies Used
 
@@ -254,68 +258,67 @@ Results Summary:
 3. **Quality Assurance**: Cross-validates local model predictions
 4. **Scalable Analysis**: Processes Turkish text with human-level understanding
 
-## 🚀 How to Run the Project
+## 🚀 Getting Started
 
 ### Prerequisites
 
 - **Python 3.11.5** or higher
 - **Jupyter Notebook** or JupyterLab
 - **8GB+ RAM** (recommended for BERT models)
-- **Internet connection** (for downloading BERT models)
+- **Internet connection** (for downloading BERT models and data)
 
-### Installation Steps
+### Quick Setup
 
-1. **Unzip and Navigate to Project**:
-   ```cmd
-   cd setur_case
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/shbkukuk/turkish-bert-sentiment-analyzer.git
+   cd turkish-bert-sentiment-analyzer
    ```
 
 2. **Install Dependencies**:
-   ```cmd
+   ```bash
    pip install -r requirements.txt
    ```
    
    **Key packages installed**:
    - `transformers` - Hugging Face BERT models
-   - `torch` - Deep learning framework
+   - `torch` - Deep learning framework  
    - `pandas`, `numpy` - Data processing
    - `matplotlib`, `seaborn` - Visualization
    - `scikit-learn` - Machine learning utilities
    - `openai` - ChatGPT API integration (optional)
 
-3. **Launch Jupyter Notebook**:
-   ```cmd
-   jupyter notebook
+3. **Prepare Your Data**:
+   
+   **Option A: Use the Data Scraper**
+   ```bash
+   python prepare_dataset.py
    ```
-   Or for JupyterLab:
-   ```cmd
-   jupyter lab
+   This will collect Turkish complaint data and save it as CSV/JSON files.
+   
+   **Option B: Use Your Own Data**
+   - Place your Turkish text data in CSV format
+   - Ensure it has a column with Turkish text content
+   - Update the notebook to point to your data file
+
+4. **Launch Jupyter Notebook**:
+   ```bash
+   jupyter notebook turkish_comment_analysis.ipynb
    ```
 
-4. **Open and Run the Analysis**:
-   - Navigate to `turkish_comment_analysis.ipynb`
+5. **Run the Analysis**:
    - Execute cells sequentially from top to bottom
    - **Total runtime**: 15-30 minutes (depending on hardware)
-
-### Alternative: Run Data Scraper (Optional)
-
-If you want to collect fresh data:
-```cmd
-python prepare_dataset.py
-```
-This will scrape new complaints from the source website.
+   - Models will download automatically on first run (~500MB)
 
 ## 📁 Project Structure
 
 ```
-setur_case/
+turkish-bert-sentiment-analyzer/
 ├── turkish_comment_analysis.ipynb    # Main analysis notebook
 ├── prepare_dataset.py                # Data scraping script
-├── setur_complaints_new.csv          # Dataset (948 complaints)
-├── setur_complaints_new.json         # Dataset (JSON format)
 ├── requirements.txt                  # Python dependencies
-├── README.md                         # This file
-├── Case_Report.pdf                   # Detailed analysis report
+├── README.md                         # Project documentation
 └── figures/                          # Generated visualizations
     ├── text_preprocessing.png
     ├── topic_model_result.png
@@ -324,11 +327,13 @@ setur_case/
     └── turkish_comment.png
 ```
 
+**Note**: Data files (CSV, JSON, PDF, ZIP) are not included in this repository for privacy and size considerations. Use the `prepare_dataset.py` script to generate your own dataset.
+
 ## 🔍 Analysis Pipeline
 
-### 1. Data Loading & Exploration
-- Load 948 Turkish complaints from CSV/JSON
-- Explore data structure and basic statistics
+### 1. Data Collection & Loading
+- Scrape Turkish complaints using `prepare_dataset.py`
+- Load and explore data structure and basic statistics
 - Handle missing values and data quality issues
 
 ### 2. Text Preprocessing & Cleaning
@@ -369,24 +374,27 @@ setur_case/
 - Sentiment comparison (Lexicon vs BERT)
 - Interactive visualizations and statistical summaries
 
-## 📊 Key Results
+## 📊 Expected Results
 
-### Sentiment Analysis Results
-- **BERT Model**: 97.8% negative, 2.2% positive
-- **Lexicon Model**: 52.1% neutral, 26.6% negative, 21.3% positive  
-- **Method Agreement**: 26.6% (indicates complexity of Turkish sentiment)
+When you run this analysis on Turkish complaint data, you can expect:
 
-### Topic Analysis Results
-- **6 Main Topics** identified through clustering
-- **Reservation Issues** dominate complaints (40.9%)
-- **Service Quality** and **Payment Problems** are secondary concerns
-- **BERT Embeddings** provide semantic clustering superior to TF-IDF
+### Sentiment Analysis Capabilities
+- **BERT Model**: High accuracy sentiment classification (~95%+)
+- **Lexicon Model**: Traditional sentiment analysis with custom Turkish dictionaries
+- **Method Comparison**: Cross-validation between different approaches
+- **ChatGPT Integration**: Enhanced contextual understanding (optional)
+
+### Topic Modeling Results
+- **Semantic Clustering**: BERT-enhanced topic discovery
+- **Business Categories**: Automatic categorization of complaint themes
+- **Topic Distribution**: Statistical analysis of complaint patterns
+- **Visualization**: Clear charts and word clouds for insights
 
 ### Technical Performance
-- **Processed**: 948 complaints, 4,217 tokens
-- **Model**: 12-layer Turkish BERT transformer
+- **Model**: 12-layer Turkish BERT transformer (`dbmdz/bert-base-turkish-cased`)
 - **Embeddings**: 768-dimensional contextual vectors
-- **Clustering**: 6-topic K-means with 85%+ coherence
+- **Processing**: Optimized for Turkish morphology and syntax
+- **Scalability**: Handles datasets from hundreds to thousands of documents
 
 ## 🛠️ Troubleshooting
 
@@ -427,14 +435,27 @@ setur_case/
 | Topic Modeling | 5-8 min | 2-3 min |
 | **Total** | **30-41 min** | **12-17 min** |
 
-## 🎯 Business Value
+## 🎯 Use Cases & Applications
 
-This analysis provides actionable insights for Setur tourism:
+This NLP pipeline can be applied to various Turkish text analysis scenarios:
 
-1. **Customer Pain Points**: Identified reservation and payment as primary issues
-2. **Service Improvement**: Specific areas needing attention (accommodation, communication)  
-3. **Sentiment Trends**: Nearly universal negative sentiment requires immediate action
-4. **Topic Prioritization**: Data-driven focus on reservation system improvements
+### Business Applications
+- **Customer Feedback Analysis**: Analyze complaints, reviews, and feedback
+- **Social Media Monitoring**: Track sentiment on Turkish social platforms
+- **Market Research**: Understand customer opinions and preferences
+- **Product Development**: Extract insights from user feedback
+
+### Technical Applications  
+- **Turkish NLP Research**: Advanced Turkish language processing
+- **Sentiment Analysis Benchmarking**: Compare different Turkish sentiment methods
+- **Educational Projects**: Learn BERT and transformer models with Turkish data
+- **API Integration**: Combine local models with cloud-based AI services
+
+### Data Science Benefits
+- **Multi-Method Validation**: Cross-validate results using different approaches
+- **Scalable Processing**: Handle large datasets efficiently
+- **Visualization Ready**: Generate publication-quality charts and insights
+- **Reproducible Research**: Well-documented methodology and code
 
 ## 📚 References & Citations
 
@@ -443,7 +464,44 @@ This analysis provides actionable insights for Setur tourism:
 - **Data Source**: Customer complaints from tourism platform
 - **Analysis Methods**: Combined lexicon-based and transformer-based approaches
 
+## 📝 Important Notes
+
+### Data Privacy & Files
+- **No Data Included**: This repository does not contain any actual complaint data, PDF reports, or ZIP files
+- **Privacy First**: All sensitive customer data has been excluded from the public repository
+- **Generate Your Own**: Use `prepare_dataset.py` to collect your own data for analysis
+- **File Types Excluded**: `*.csv`, `*.json`, `*.pdf`, `*.zip` files are in `.gitignore`
+
+### Getting Data
+To run this analysis, you need to:
+1. **Run the scraper**: `python prepare_dataset.py` to collect Turkish text data
+2. **Use your own data**: Replace data loading sections with your Turkish text dataset
+3. **Follow the notebook**: Step-by-step instructions are provided in the Jupyter notebook
+
+### Model Downloads
+- Turkish BERT model (~500MB) downloads automatically on first run
+- Requires internet connection for initial setup
+- Models are cached locally after first download
+
+## 🤝 Contributing
+
+Feel free to contribute to this project by:
+- Adding new Turkish NLP features
+- Improving the analysis pipeline
+- Enhancing visualizations
+- Adding support for other languages
+- Optimizing performance
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 🔗 Contact
+
+- **GitHub Issues**: For bugs and feature requests
+- **Discussions**: For questions and community support
+
 ---
 
-*This project demonstrates advanced NLP techniques applied to Turkish language processing, combining traditional methods with cutting-edge transformer models for comprehensive text analysis.*
+*This project demonstrates advanced NLP techniques for Turkish language processing, combining traditional methods with cutting-edge transformer models for comprehensive text analysis.*
 

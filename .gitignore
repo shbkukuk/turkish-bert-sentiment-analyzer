@@ -21,5 +21,20 @@ dist/
 # JSON files
 *.json
 
-# CSV files
+# Data files (not included in repository)
 *.csv
+*.json
+*.pdf
+*.zip
+
+# VS Code settings
+.vscode/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# MacOS files
+.DS_Store
+
+# Windows files
+Thumbs.db
